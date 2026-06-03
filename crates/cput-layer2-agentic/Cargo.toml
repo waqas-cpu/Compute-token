@@ -1,0 +1,18 @@
+[package]
+name = "cput-layer2-agentic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "VERTICAL LAYER 2: autonomous agentic minting — multi-agent quorum consensus and ZK-proven mint instructions."
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+cput-zk.workspace = true
+cput-gates.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true

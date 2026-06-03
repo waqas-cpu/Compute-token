@@ -1,0 +1,25 @@
+[package]
+name = "cput-node"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Binary: end-to-end CPUT pipeline demo (L0→L1→L2→L4→L5 across every integration gate)."
+
+[[bin]]
+name = "cput-node"
+path = "src/main.rs"
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+cput-zk.workspace = true
+cput-gates.workspace = true
+cput-layer0-compute.workspace = true
+cput-layer1-oracle.workspace = true
+cput-layer2-agentic.workspace = true
+cput-layer4-tokenomics.workspace = true
+cput-layer5-settlement.workspace = true
+hex.workspace = true

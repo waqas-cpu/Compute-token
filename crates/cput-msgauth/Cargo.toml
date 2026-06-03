@@ -1,0 +1,14 @@
+[package]
+name = "cput-msgauth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "HORIZONTAL FABRIC: cross-layer message authentication and anti-replay protection."
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+serde.workspace = true

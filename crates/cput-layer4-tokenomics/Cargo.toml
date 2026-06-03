@@ -1,0 +1,19 @@
+[package]
+name = "cput-layer4-tokenomics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "VERTICAL LAYER 4: off-chain tokenomics engine — distribution split, demand-side burn market, and elastic-supply governor."
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+cput-zk.workspace = true
+cput-gates.workspace = true
+cput-audit.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true

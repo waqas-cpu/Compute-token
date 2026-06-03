@@ -1,0 +1,20 @@
+[package]
+name = "cput-pqc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "HORIZONTAL FABRIC: post-quantum cryptography (NIST FIPS 203/204/205) and crypto-agility registry."
+
+[dependencies]
+cput-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+hex.workspace = true
+sha2.workspace = true
+fips203.workspace = true
+fips204.workspace = true
+fips205.workspace = true

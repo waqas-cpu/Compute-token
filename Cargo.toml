@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cput-core",
+    # Horizontal (cross-cutting) fabrics
+    "crates/cput-pqc",
+    "crates/cput-zk",
+    "crates/cput-audit",
+    "crates/cput-msgauth",
+    # Integration gates
+    "crates/cput-gates",
+    # Vertical layers
+    "crates/cput-layer0-compute",
+    "crates/cput-layer1-oracle",
+    "crates/cput-layer2-agentic",
+    "crates/cput-layer4-tokenomics",
+    "crates/cput-layer5-settlement",
+    # Binaries
+    "crates/bins/cput-node",
+    "crates/bins/cput-oracle",
+    "crates/bins/cput-agent",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "Apache-2.0"
+authors = ["CPUT Protocol Contributors"]
+repository = "https://github.com/waqas-cpu/Compute-token"
+
+[workspace.dependencies]
+# Internal crates
+cput-core = { path = "crates/cput-core" }
+cput-pqc = { path = "crates/cput-pqc" }
+cput-zk = { path = "crates/cput-zk" }
+cput-audit = { path = "crates/cput-audit" }
+cput-msgauth = { path = "crates/cput-msgauth" }
+cput-gates = { path = "crates/cput-gates" }
+cput-layer0-compute = { path = "crates/cput-layer0-compute" }
+cput-layer1-oracle = { path = "crates/cput-layer1-oracle" }
+cput-layer2-agentic = { path = "crates/cput-layer2-agentic" }
+cput-layer4-tokenomics = { path = "crates/cput-layer4-tokenomics" }
+cput-layer5-settlement = { path = "crates/cput-layer5-settlement" }
+
+# Third-party
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+sha2 = "0.10"
+hex = "0.4"
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+# NIST FIPS post-quantum cryptography (pure-Rust, integritychain)
+fips203 = "0.4"  # ML-KEM (FIPS 203)
+fips204 = "0.4"  # ML-DSA (FIPS 204)
+fips205 = "0.4"  # SLH-DSA (FIPS 205)
+
+[profile.release]
+opt-level = 3
+lto = "thin"

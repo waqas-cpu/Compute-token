@@ -1,0 +1,22 @@
+[package]
+name = "cput-oracle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Binary: oracle DON daemon (Layer 1) — verifies attestations and emits a threshold-signed epoch report."
+
+[[bin]]
+name = "cput-oracle"
+path = "src/main.rs"
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+cput-zk.workspace = true
+cput-gates.workspace = true
+cput-layer0-compute.workspace = true
+cput-layer1-oracle.workspace = true
+hex.workspace = true

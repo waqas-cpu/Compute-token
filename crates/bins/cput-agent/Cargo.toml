@@ -1,0 +1,23 @@
+[package]
+name = "cput-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Binary: minting agent daemon (Layer 2) — multi-agent quorum consensus producing a ZK-proven mint instruction."
+
+[[bin]]
+name = "cput-agent"
+path = "src/main.rs"
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+cput-zk.workspace = true
+cput-gates.workspace = true
+cput-layer0-compute.workspace = true
+cput-layer1-oracle.workspace = true
+cput-layer2-agentic.workspace = true
+hex.workspace = true

@@ -24,6 +24,10 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod dkg;
+
+pub use dkg::{assert_dkg_current, IndependentSigScheme, ThresholdScheme};
+
 use cput_core::ids::{EpochId, OracleId};
 use cput_core::units::{Gflops, QualityScore};
 use cput_core::{policy, CputError, CputResult};
@@ -193,6 +197,7 @@ impl<'a, B: ProofBackend> OracleNetwork<'a, B> {
         Ok(EpochReport {
             body,
             aggregated_proof,
+            leaf_public_inputs: batch_inputs,
             threshold_sig: ThresholdSignature { shares },
         })
     }

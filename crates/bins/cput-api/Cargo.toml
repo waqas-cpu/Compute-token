@@ -1,0 +1,21 @@
+[package]
+name = "cput-api-bin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "HTTP server exposing CPUT pipeline data to the frontend."
+
+[[bin]]
+name = "cput-api"
+path = "src/main.rs"
+
+[dependencies]
+cput-api.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+axum.workspace = true

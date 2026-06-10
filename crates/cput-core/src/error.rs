@@ -81,4 +81,12 @@ pub enum CputError {
     /// A compliance / transfer-restriction rule blocked the action.
     #[error("compliance blocked: {0}")]
     ComplianceBlocked(String),
+
+    /// On-chain integration / relayer failure.
+    #[error("chain error: {0}")]
+    Chain(String),
+
+    /// Persistent store I/O failure.
+    #[error("store error: {0}")]
+    Store(String),
 }

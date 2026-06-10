@@ -1,0 +1,16 @@
+[package]
+name = "cput-keycustody"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Key custody backends for CPUT operators — file, TEE, and HSM-shaped interfaces."
+
+[dependencies]
+cput-core.workspace = true
+cput-pqc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+hex.workspace = true

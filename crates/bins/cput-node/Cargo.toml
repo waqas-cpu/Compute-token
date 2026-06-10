@@ -22,4 +22,6 @@ cput-layer1-oracle.workspace = true
 cput-layer2-agentic.workspace = true
 cput-layer4-tokenomics.workspace = true
 cput-layer5-settlement.workspace = true
+cput-queue.workspace = true
+clap.workspace = true
 hex.workspace = true

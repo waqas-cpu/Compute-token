@@ -1,0 +1,19 @@
+[package]
+name = "cput-flop-meter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Simulated flop-meter daemon — polls GPU telemetry and pushes to the pipeline queue."
+
+[[bin]]
+name = "cput-flop-meter"
+path = "src/main.rs"
+
+[dependencies]
+cput-core.workspace = true
+cput-layer0-compute.workspace = true
+cput-queue.workspace = true
+clap.workspace = true

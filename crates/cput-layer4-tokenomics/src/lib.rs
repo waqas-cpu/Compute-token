@@ -225,4 +225,14 @@ impl<'a, B: ProofBackend> TokenomicsEngine<'a, B> {
     pub fn set_ceiling(&mut self, ceiling: TokenAmount) {
         self.mint_ceiling = ceiling;
     }
+
+    /// Sync the live ceiling from a Sui governance intent (downward gate 5→2/4).
+    pub fn sync_ceiling_from_chain(
+        &mut self,
+        mint_ceiling: u64,
+        _circuit_breaker_engaged: bool,
+    ) -> CputResult<()> {
+        self.mint_ceiling = TokenAmount(u128::from(mint_ceiling));
+        Ok(())
+    }
 }

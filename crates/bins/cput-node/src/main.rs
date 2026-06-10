@@ -1,39 +1,65 @@
-//! End-to-end CPUT pipeline demonstration.
+//! CPUT compute node (Layer 0).
 //!
-//! Drives one full minting cycle through every vertical layer and every
-//! integration gate, using the deterministic reference ZK backend:
-//!
-//! ```text
-//! L0 compute ──Gate 0→1──▶ L1 oracle ──Gate 1→2──▶ L2 agents
-//!     ──Gate 2→4──▶ L4 tokenomics ──Gate 4→5──▶ L5 settlement
-//!     ──downward Gate 5→2/4──▶ governance policy update
-//! ```
-//!
-//! It is a wiring demonstration, not a test: it exercises the producer/consumer
-//! path so the whole prototype is shown to compose and run.
+//! - **Default:** full L0→L5 wiring demonstration (in-process).
+//! - **`--ingest`:** read flop-meter telemetry from the pipeline queue, sign
+//!   attestations, and push to the attestations topic for `cput-oracle`.
 
+mod ingest;
+
+use clap::Parser;
 use cput_core::ids::{AgentId, EpochId, OracleId, WorkloadHash};
-use cput_core::units::{Bps, Gflops, TokenAmount};
+use cput_core::units::{Bps, TokenAmount};
 use cput_gates::gate::{admit_policy_update, GateConfig};
-use cput_layer0_compute::ComputeNode;
+use cput_layer0_compute::{ComputeNode, SimulatedFlopMeter, SimulatedFlopMeterConfig};
 use cput_layer1_oracle::{OracleNetwork, OracleNode};
-use cput_layer2_agentic::{AgentQuorum, EmissionPolicy, MintingAgent};
+use cput_layer2_agentic::{default_emission_policy, AgentQuorum, MintingAgent};
 use cput_layer4_tokenomics::TokenomicsEngine;
 use cput_layer5_settlement::{Ballot, Proposal, SettlementLayer};
 use cput_pqc::mldsa::MlDsaKeypair;
 use cput_pqc::slhdsa::SlhDsaKeypair;
 use cput_pqc::AlgorithmRegistry;
-use cput_zk::ReferenceBackend;
+use cput_zk::ZkBackend;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(name = "cput-node", about = "CPUT compute node (Layer 0)")]
+struct Args {
+    /// Ingest telemetry from the pipeline queue and emit attestations.
+    #[arg(long)]
+    ingest: bool,
+    /// Pipeline queue directory.
+    #[arg(long, default_value = "data/pipeline")]
+    queue: PathBuf,
+    /// Epoch to process (ingest mode).
+    #[arg(long, default_value_t = 1000)]
+    epoch: u64,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    if args.ingest {
+        return run_ingest(&args);
+    }
+    run_demo()
+}
+
+fn run_ingest(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+    let epoch = EpochId(args.epoch);
+    println!("== cput-node ingest epoch {} ==", epoch.0);
+    let packets = ingest::ingest_telemetry(&args.queue, epoch)?;
+    println!("== ingest complete: {} attestation(s) queued ==", packets.len());
+    Ok(())
+}
+
+fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
     let registry = AlgorithmRegistry::default();
-    let backend = ReferenceBackend;
+    let backend = ZkBackend::from_env();
+    println!("zk backend = {}", backend);
     let epoch = EpochId(1_000);
 
-    println!("== CPUT end-to-end pipeline (reference ZK backend) ==");
+    println!("== CPUT end-to-end pipeline (ZK: {}) ==", backend.kind());
     println!("epoch = {epoch}\n");
 
-    // ---- Layer 0: register nodes and produce signed, ZK-proven attestations.
     let node_specs = [
         ("gpu-h100", 50_000_000u128),
         ("gpu-a100", 30_000_000),
@@ -42,18 +68,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut attestations = Vec::new();
     for (i, (class, rate)) in node_specs.iter().enumerate() {
         let node = ComputeNode::register(&backend, *class, *rate, "US", [i as u8; 32])?;
-        let gflops = Gflops(rate * 300); // 300s of the 360s epoch at rated speed
-        let packet =
-            node.produce_attestation(epoch, gflops, WorkloadHash([i as u8; 32]), 72, [0xAB; 32])?;
+        let meter = SimulatedFlopMeter::new(SimulatedFlopMeterConfig {
+            rated_gflops_per_sec: *rate,
+            util_bps: 8_500 + u16::try_from(i).unwrap_or(0) * 300,
+            thermal_c: 68 + u16::try_from(i).unwrap_or(0) * 2,
+            ..Default::default()
+        });
+        let samples = meter.collect_epoch_samples();
+        let packet = node.produce_attestation_from_samples(
+            epoch,
+            &samples,
+            meter.sample_interval_secs(),
+            WorkloadHash([i as u8; 32]),
+            [0xAB; 32],
+        )?;
         println!(
-            "L0  node {} attested {} GFLOPs ({class})",
+            "L0  node {} attested {} GFLOPs from {} flop-meter samples ({class})",
             node.node_id(),
-            gflops.0
+            packet.signed.body.gflops.0,
+            samples.len()
         );
         attestations.push(packet);
     }
 
-    // ---- Layer 1: oracle DON re-verifies (Gate 0→1) and emits a report.
     let mut operators = Vec::new();
     for i in 0..cput_core::policy::ORACLE_SET_SIZE as u16 {
         operators.push(OracleNode::new(OracleId(i))?);
@@ -68,16 +105,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         report.threshold_sig.shares.len()
     );
 
-    // ---- Layer 2: agent quorum consumes report (Gate 1→2) and mints.
-    let emission = EmissionPolicy {
-        tokens_per_gflop: 1,
-        version: "v1".into(),
-    };
+    let emission = default_emission_policy();
     let coordinator = MlDsaKeypair::generate()?;
     let coordinator_key = coordinator.public_bytes();
-    let agents = (0..cput_core::policy::AGENT_QUORUM_SIZE as u8)
+    let agents: Vec<MintingAgent> = (0..cput_core::policy::AGENT_QUORUM_SIZE as u8)
         .map(|i| MintingAgent::new(AgentId(i)))
-        .collect();
+        .collect::<Result<_, _>>()?;
     let quorum = AgentQuorum::new(
         GateConfig {
             registry: &registry,
@@ -94,7 +127,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         instruction.signed.body.allocations.len()
     );
 
-    // ---- Layer 4: tokenomics engine settles (Gate 2→4) and splits supply.
     let engine_signer = MlDsaKeypair::generate()?;
     let mut engine = TokenomicsEngine::new(
         GateConfig {
@@ -103,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         engine_signer,
         coordinator_key,
-        TokenAmount(u128::MAX), // generous genesis ceiling
+        TokenAmount(u128::MAX),
     );
     let receipt = engine.settle(report.body.verified_gflops_total, &instruction)?;
     let b = &receipt.body;
@@ -117,7 +149,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         routing.burned.0, routing.providers.0, routing.treasury.0
     );
 
-    // ---- Layer 5: settlement finalisation (Gate 4→5) + governance.
     let governance_key = SlhDsaKeypair::generate()?;
     let settlement = SettlementLayer::new(&registry, governance_key);
     let commitment = settlement.finalize_settlement(&receipt)?;
@@ -154,7 +185,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tally.for_power, tally.against_power, proposal.mint_ceiling.0
     );
 
-    // ---- Downward Gate 5→2/4: admit the policy update back into minting.
     admit_policy_update(&registry, &settlement.governance_key(), &policy_update)?;
     engine.set_ceiling(policy_update.body.mint_ceiling);
     println!(
@@ -162,7 +192,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         engine.mint_ceiling.0
     );
 
-    // Demonstrate the elastic governor recommendation under low utilisation.
     let recommended = engine.recommend_ceiling(Bps(5_000));
     println!(
         "L4  governor (util 50%) recommends ceiling = {}",

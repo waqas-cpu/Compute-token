@@ -19,6 +19,12 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod flop_meter;
+pub mod tee;
+
+pub use flop_meter::{SimulatedFlopMeter, SimulatedFlopMeterConfig};
+pub use tee::{ReferenceTeeVerifier, TeeIdentity, TeeVerifier};
+
 use cput_core::ids::{EpochId, NodeId, WorkloadHash};
 use cput_core::policy::EPOCH_SECONDS;
 use cput_core::units::Gflops;
@@ -26,7 +32,7 @@ use cput_core::{CputError, CputResult};
 use cput_gates::contracts::{AttestationBody, AttestationPacket};
 use cput_pqc::envelope::Signed;
 use cput_pqc::mldsa::MlDsaKeypair;
-use cput_zk::{encode_statement, ComputeStatement, ProofBackend};
+use cput_zk::{ComputeStatement, ComputeWitness, ProofBackend};
 use serde::{Deserialize, Serialize};
 
 /// A point-in-time hardware telemetry sample (sampled at sub-epoch intervals).
@@ -145,7 +151,9 @@ impl<'b, B: ProofBackend> ComputeNode<'b, B> {
             workload_hash,
             enclave_measurement: self.enclave_measurement,
         };
-        let compute_proof = self.backend.prove(&encode_statement(&statement)?)?;
+        let witness =
+            ComputeWitness::from_attestation(gflops, workload_hash, verified_hash);
+        let compute_proof = self.backend.prove_compute(&statement, &witness)?;
 
         // Seal the body under the node's ML-DSA key (R0.3).
         let signed = Signed::seal_mldsa(&self.keypair, body)?;
@@ -153,5 +161,34 @@ impl<'b, B: ProofBackend> ComputeNode<'b, B> {
             signed,
             compute_proof,
         })
+    }
+
+    /// Produce an attestation from flop-meter telemetry samples (simulated or real).
+    ///
+    /// Aggregates sample throughput into epoch GFLOPs and uses the peak thermal
+    /// reading across the window. Enforces R0.2 and R0.4 via [`produce_attestation`].
+    pub fn produce_attestation_from_samples(
+        &self,
+        epoch: EpochId,
+        samples: &[TelemetrySample],
+        sample_interval_secs: u64,
+        workload_hash: WorkloadHash,
+        verified_hash: [u8; 32],
+    ) -> CputResult<AttestationPacket> {
+        if samples.is_empty() {
+            return Err(CputError::RuleViolation {
+                rule: "R0.4",
+                detail: "refusing to attest with zero telemetry samples".into(),
+            });
+        }
+        let gflops = SimulatedFlopMeter::aggregate_gflops(samples, sample_interval_secs);
+        let thermal_envelope_c = SimulatedFlopMeter::peak_thermal_c(samples);
+        self.produce_attestation(
+            epoch,
+            gflops,
+            workload_hash,
+            thermal_envelope_c,
+            verified_hash,
+        )
     }
 }

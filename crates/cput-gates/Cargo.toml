@@ -16,3 +16,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 hex.workspace = true
+
+[dev-dependencies]
+cput-layer0-compute.workspace = true
+cput-zk.workspace = true

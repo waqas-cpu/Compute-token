@@ -3,9 +3,15 @@
 **/*.rs.bk
 Cargo.lock.orig
 
-# Move / Aptos
+# Move / Aptos (legacy)
 move/**/build/
 .aptos/
+
+# Move / Sui
+sui-move/build/
+.sui-bin/
+.sui-framework/
+sui-move/Pub.*.toml
 
 # Editor / OS
 .DS_Store
@@ -13,6 +19,23 @@ move/**/build/
 .idea/
 .vscode/
 
-# Local env
+# Local env & secrets
 .env
 *.local
+data/
+config/cput.toml
+config/cput.devnet.toml
+config/*.pub.toml
+config/*ephemeral*
+
+# Relayer / persistence
+*.db
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Noir / circuits build
+circuits/**/target/
+Nargo.toml.lock

@@ -1,5 +1,6 @@
 //! Economic and physical units.
 
+use crate::error::{CputError, CputResult};
 use serde::{Deserialize, Serialize};
 
 /// Verified compute volume, expressed in GFLOPs delivered within an epoch.
@@ -11,6 +12,13 @@ impl Gflops {
     #[must_use]
     pub fn saturating_add(self, other: Gflops) -> Gflops {
         Gflops(self.0.saturating_add(other.0))
+    }
+
+    /// Convert to Sui `u64` on-chain representation (bounded).
+    pub fn to_chain_u64(self) -> CputResult<u64> {
+        u64::try_from(self.0).map_err(|_| {
+            CputError::Chain(format!("GFLOPs {} exceeds Sui u64::MAX", self.0))
+        })
     }
 }
 
@@ -29,6 +37,13 @@ impl TokenAmount {
     #[must_use]
     pub fn apply_bps(self, bps: Bps) -> TokenAmount {
         TokenAmount(self.0.saturating_mul(u128::from(bps.0)) / 10_000)
+    }
+
+    /// Convert to Sui `u64` base units (bounded).
+    pub fn to_chain_u64(self) -> CputResult<u64> {
+        u64::try_from(self.0).map_err(|_| {
+            CputError::Chain(format!("token amount {} exceeds Sui u64::MAX", self.0))
+        })
     }
 }
 

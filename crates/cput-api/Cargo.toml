@@ -1,0 +1,28 @@
+[package]
+name = "cput-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "HTTP API bridging the CPUT frontend to queue, relayer store, and Sui RPC."
+
+[dependencies]
+cput-core.workspace = true
+cput-queue.workspace = true
+cput-store.workspace = true
+cput-sui.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+cput-gates.workspace = true
+cput-layer0-compute.workspace = true
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }

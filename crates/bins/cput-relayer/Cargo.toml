@@ -1,0 +1,28 @@
+[package]
+name = "cput-relayer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Production Sui relayer: posts epoch reports and mints, reconciles on-chain events."
+
+[[bin]]
+name = "cput-relayer"
+path = "src/main.rs"
+
+[dependencies]
+cput-core.workspace = true
+cput-gates.workspace = true
+cput-layer1-oracle.workspace = true
+cput-layer2-agentic.workspace = true
+cput-layer4-tokenomics.workspace = true
+cput-layer5-settlement.workspace = true
+cput-pqc.workspace = true
+cput-sui.workspace = true
+cput-zk.workspace = true
+clap.workspace = true
+hex.workspace = true
+serde_json.workspace = true
+cput-layer0-compute.workspace = true

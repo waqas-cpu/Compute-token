@@ -1,0 +1,4 @@
+# ML-DSA-87 keygen/sign uses large stack frames; default Windows 1 MiB thread
+# stack overflows in debug builds. 16 MiB matches typical production headroom.
+[target.'cfg(windows)']
+rustflags = ["-C", "link-args=/STACK:16777216"]

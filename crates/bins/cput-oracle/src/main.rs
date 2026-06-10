@@ -1,21 +1,64 @@
-//! Oracle DON daemon demonstration (Layer 1).
+//! Oracle DON daemon (Layer 1).
 //!
-//! Stands up a 9-operator decentralised oracle network, ingests a batch of
-//! Layer 0 attestations through **Gate 0→1**, recursively aggregates their ZK
-//! proofs, and emits the threshold-signed epoch report consumed by Layer 2.
+//! - **Default:** synthesise attestations in-process (demo).
+//! - **`--ingest`:** read attestation packets from the pipeline queue, emit a
+//!   threshold-signed epoch report, and push to the epoch-reports topic.
 
+mod ingest;
+
+use clap::Parser;
 use cput_core::ids::{EpochId, OracleId, WorkloadHash};
 use cput_core::policy;
 use cput_core::units::Gflops;
 use cput_layer0_compute::ComputeNode;
 use cput_layer1_oracle::{OracleNetwork, OracleNode};
 use cput_pqc::AlgorithmRegistry;
-use cput_zk::ReferenceBackend;
+use cput_sui::submit_report_from_epoch;
+use cput_zk::ZkBackend;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(name = "cput-oracle")]
+struct Args {
+    #[arg(long, default_value_t = 42)]
+    epoch: u64,
+    #[arg(long)]
+    relay_config: Option<PathBuf>,
+    /// Ingest attestations from the pipeline queue.
+    #[arg(long)]
+    ingest: bool,
+    /// Pipeline queue directory.
+    #[arg(long, default_value = "data/pipeline")]
+    queue: PathBuf,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    if args.ingest {
+        return run_ingest(&args);
+    }
+    run_demo(&args)
+}
+
+fn run_ingest(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
+    let epoch = EpochId(args.epoch);
+    println!("== cput-oracle ingest epoch {} ==", epoch.0);
+    let report = ingest::ingest_attestations(&args.queue, epoch)?;
+    let intent = submit_report_from_epoch(&report)?;
+    println!(
+        "sui submit_report intent: epoch={} gflops={} signers={}",
+        intent.epoch,
+        intent.verified_gflops,
+        intent.signer_indices.len()
+    );
+    println!("== oracle ingest complete ==");
+    Ok(())
+}
+
+fn run_demo(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let registry = AlgorithmRegistry::default();
-    let backend = ReferenceBackend;
-    let epoch = EpochId(42);
+    let backend = ZkBackend::from_env();
+    let epoch = EpochId(args.epoch);
 
     println!("== CPUT oracle DON (Layer 1) ==");
     println!(
@@ -24,7 +67,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         policy::ORACLE_SET_SIZE
     );
 
-    // Synthesise a batch of Layer 0 attestations to ingest.
     let mut attestations = Vec::new();
     for i in 0..4u8 {
         let node = ComputeNode::register(&backend, "gpu-h100", 50_000_000, "US", [i; 32])?;
@@ -69,5 +111,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "dispute window closes at {}",
         report.body.dispute_window_close
     );
+
+    let intent = submit_report_from_epoch(&report)?;
+    println!(
+        "sui submit_report intent: epoch={} gflops={} signers={}",
+        intent.epoch,
+        intent.verified_gflops,
+        intent.signer_indices.len()
+    );
+    if let Some(path) = &args.relay_config {
+        let cfg = cput_sui::SuiDeployment::from_file(path)?;
+        println!("relay config loaded (dry_run={})", cfg.dry_run);
+    }
     Ok(())
 }

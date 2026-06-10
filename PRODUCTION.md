@@ -16,9 +16,10 @@ three axes as the architecture, plus a cross-cutting security section.
 - ✅ Algorithm-tagged `SealedEnvelope` and an approved-algorithm registry give
   **crypto-agility**: new NIST standards can be added by governance without
   changing verifier logic.
-- ⚠️ **Key management.** Keys are generated in-process. Production must bind
-  ML-DSA signing keys to the node's TEE (sealing/quoting), store oracle DKG
-  shares in HSMs, and rotate per `DKG_ROTATION_EPOCHS`.
+- ⚠️ **Key management (`cput-keycustody`).** `KeyBackend::{Ephemeral,File,TeeSealed,Hsm}`
+  interface added; only Ephemeral/File (public record) work on testnet. Production
+  must bind ML-DSA signing keys to the node's TEE (sealing/quoting), store oracle
+  DKG shares in HSMs, and rotate per `DKG_ROTATION_EPOCHS`.
 - ❌ **Hybrid signatures.** Consider Ed25519+ML-DSA hybrid envelopes during the
   migration window so the chain remains verifiable by classical verifiers.
 
@@ -52,34 +53,36 @@ three axes as the architecture, plus a cross-cutting security section.
 
 | Layer | Production gaps |
 |-------|-----------------|
-| L0 compute | ❌ Real TEE attestation (SGX/SEV-SNP/TDX quote verification) instead of the placeholder enclave measurement. ⚠️ Hardware telemetry source. |
-| L1 oracle  | ❌ Real DKG + threshold signatures (currently independent ML-DSA sigs counted to a threshold). ❌ Challenge-sampling protocol & dispute handling. |
-| L2 agentic | ⚠️ Agents share one deterministic formula; production runs genuinely independent models/inference and compares. ❌ Byzantine-agent eviction. |
+| L0 compute | ⚠️ `tee::TeeVerifier` trait + `ReferenceTeeVerifier` stub. ❌ Real SGX/SEV-SNP/TDX quote verification. ⚠️ Hardware telemetry source. |
+| L1 oracle  | ⚠️ `dkg::ThresholdScheme` trait + `IndependentSigScheme` (current behaviour). ❌ Real DKG ceremony + threshold crypto. ❌ Challenge-sampling & disputes. |
+| L2 agentic | ⚠️ Three `MintingAgent` formula agents (`bias_bps=0`); `assess_quorum_health()` + `cput-agent --health`. ❌ Independent inference models; ❌ Byzantine eviction. |
 | L4 tokenomics | ⚠️ TWAP utilisation is an input; production must source it from real demand telemetry. ⚠️ State is in-memory; back it with the chain as source of truth. |
 | L5 settlement | ⚠️ Governance is single-process; production binds it to the on-chain `governance` module and a real proposal lifecycle (timelocks, quorums). |
 
 ---
 
-## 3. On-chain (Move / Aptos)
+## 3. On-chain (Move / Sui) — **deploy target**
 
-- ✅ All 11 modules compile against the Aptos mainnet framework.
-- ⚠️ **Address.** `move/Move.toml` pins `cput = 0xc9007` for compile convenience.
-  Deploy under a real resource account and switch to a named-address profile.
-- ❌ **On-chain PQC verification.** ML-DSA/SLH-DSA are not in the Aptos framework.
-  Options: (a) a verified off-chain relayer that the framework trusts via a
-  multisig, (b) a custom native function / precompile, (c) a Move-native
-  verifier if/when one is standardised. Today the Move gates enforce the
-  *threshold, replay, and economic* invariants and treat signature bytes as
-  relayer-checked.
-- ❌ **Token framework.** `cput_token` is a self-contained balance ledger for
-  clarity. Production should migrate to the Aptos **Dispatchable Fungible Asset**
-  standard so wallets/DEXes interoperate, keeping the `compliance` hook as the
-  transfer dispatch function.
-- ❌ **Upgradability & governance custody.** Use resource-account-based package
-  publishing with governance-controlled upgrade policy.
-- ❌ **Tests & formal verification.** Add Move unit tests and Move Prover
-  specs (`spec` blocks) for the conservation and threshold invariants. *(Out of
-  scope for this prototype per the build request.)*
+- ✅ `sui-move/` compiles (9 modules + `audit_registry`) on Sui Coin standard.
+- ✅ Economic unit tests (`policy_tests.move`) prove split conservation.
+- ✅ **`cput-sui` relayer crate** — adapters, JSON-RPC reconciliation, CLI submit,
+  durable `cput-store` cursor.
+- ✅ **`cput-relayer` binary** — end-to-end off-chain pipeline → `submit_report` +
+  `execute_mint` (dry-run by default).
+- ⚠️ **Addresses.** Fill `config/cput.example.toml` after `sui client publish`.
+- ⚠️ **On-chain PQC verification.** ML-DSA/SLH-DSA are verified off-chain by the
+  relayer; on-chain modules enforce threshold, replay, and economic invariants.
+- ⚠️ **Transaction builder.** Relayer uses `sui client call` subprocess; migrate
+  to `sui-sdk` PTB builder for HA deployments.
+- ❌ **Upgradability & governance custody.** Package upgrade policy + DAO
+  `AdminCap` transfer not yet automated.
+- ⚠️ **Move Prover specs** — invariant targets documented in `sui-move/specs/README.md`;
+  runtime tests in `policy_tests.move` pass; formal `sui move prove` not yet in CI.
+
+### Legacy Aptos prototype (`move/`)
+
+The original 11-module Aptos package remains for reference. New deployments
+should use `sui-move/` only.
 
 ---
 
@@ -101,13 +104,44 @@ three axes as the architecture, plus a cross-cutting security section.
 
 ---
 
-## 5. Deployment outline
+## 5. Deployment outline — **testnet first, mainnet after hardening**
 
-1. Stand up oracle DON with DKG; publish operator key set to `oracle_verifier`.
-2. Publish the Move package under a resource account; `initialize` every module
-   (`pqc_registry`, `audit_registry`, `compliance`, `cput_token`, `governor`,
-   `minting` pools, `staking`, `governance`).
-3. Deploy L0 node binaries into TEEs; register nodes.
-4. Run one epoch end-to-end on testnet; reconcile the off-chain
-   `SettlementReceipt` against the on-chain `EpochMinted` event.
-5. Enable governance; transfer admin authority to the DAO/council multisig.
+> **Do not deploy to mainnet** until ZK, TEE, DKG, HSM, and Move Prover items
+> in §4 are complete and externally audited.
+
+### 5.1 Testnet (automated)
+
+```powershell
+# Fund testnet address first if needed: sui client faucet
+.\scripts\deploy-testnet.ps1 -SuiCli ".\.sui-bin\sui.exe"
+```
+
+Then:
+
+1. Copy emitted template → `config/cput.toml`; fill shared object IDs from publish output.
+2. `cargo run --release --bin cput-agent -- --health` — quorum readiness probe.
+3. `cargo run --release --bin cput-relayer -- --config config/cput.toml --dry-run`
+4. Set `dry_run = false`; run one epoch; reconcile via `cput-sui::reconcile`.
+
+### 5.2 Agent health (Layer 2)
+
+Three **formula agents** (`MintingAgent` indices 0–2) each run the committed
+emission policy (`DEFAULT_TOKENS_PER_GFLOP = 1`). Health checks:
+
+| Check | Command / API |
+|-------|----------------|
+| Quorum size | `assess_quorum_health()` → `quorum_size == 3` |
+| Spread within tolerance | `spread_bps <= 200` |
+| Policy binding | `policy_hash_hex` matches on-chain governance hash |
+| Readiness probe | `cput-agent --health` (exit 0 = healthy, JSON report) |
+| Relayer preflight | `cput-relayer` aborts if quorum unhealthy before relay |
+
+### 5.3 Mainnet gate (manual checklist)
+
+- [ ] Reference ZK replaced with audited circuits
+- [ ] TEE quote verification wired in L0
+- [ ] Real DKG + HSM custody for oracle operators
+- [ ] `sui move prove` passes conservation specs (P1–P4)
+- [ ] Relayer migrated to `sui-sdk` PTB builder
+- [ ] External economic audit complete
+- [ ] `AdminCap` transferred to DAO multisig

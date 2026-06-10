@@ -19,4 +19,7 @@ cput-zk.workspace = true
 cput-gates.workspace = true
 cput-layer0-compute.workspace = true
 cput-layer1-oracle.workspace = true
+cput-sui.workspace = true
+cput-queue.workspace = true
+clap.workspace = true
 hex.workspace = true

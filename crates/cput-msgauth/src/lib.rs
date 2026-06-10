@@ -102,3 +102,36 @@ impl ReplayGuard {
         Ok(())
     }
 }
+
+/// Durable replay guard backed by a JSON file (production gate ingress).
+#[derive(Debug)]
+pub struct PersistentReplayGuard {
+    path: std::path::PathBuf,
+    last_seq: HashMap<Vec<u8>, u64>,
+}
+
+impl PersistentReplayGuard {
+    /// Load or create a replay guard at `path`.
+    pub fn open(path: impl Into<std::path::PathBuf>) -> CputResult<Self> {
+        let path = path.into();
+        let last_seq = if path.exists() {
+            let bytes = std::fs::read(&path).map_err(|e| CputError::Store(e.to_string()))?;
+            serde_json::from_slice(&bytes).map_err(|e| CputError::Store(e.to_string()))?
+        } else {
+            HashMap::new()
+        };
+        Ok(Self { path, last_seq })
+    }
+
+    /// Verify MAC + monotonic sequence and persist the high-water mark.
+    pub fn admit(&mut self, msg: &AuthenticatedMessage) -> CputResult<()> {
+        let mut guard = ReplayGuard {
+            last_seq: self.last_seq.clone(),
+        };
+        guard.admit(msg)?;
+        self.last_seq = guard.last_seq;
+        let bytes = serde_json::to_vec(&self.last_seq).map_err(|e| CputError::Store(e.to_string()))?;
+        std::fs::write(&self.path, bytes).map_err(|e| CputError::Store(e.to_string()))?;
+        Ok(())
+    }
+}

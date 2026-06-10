@@ -143,18 +143,22 @@ and `burn_market_split_is_valid()` both assert their shares sum to 100%.
 
 ---
 
-## 5. On-chain mirror (Move / Aptos)
+## 5. On-chain mirror (Move / Sui) — deploy target
 
 | Module | Mirrors | Enforces on-chain |
 |--------|---------|-------------------|
-| `pqc_registry`    | `cput-pqc` registry | approved algorithm tags (crypto-agility) |
-| `audit_registry`  | `cput-audit`        | monotonic, append-only signed epoch roots |
-| `compliance`      | ERC-1400 rules      | KYC + partition transfer restrictions |
-| `cput_token`      | the token           | compliance-gated balances, friend-only mint/burn |
-| `oracle_verifier` | Gate 1→2            | t-of-n threshold + distinct signers |
-| `minting`         | Gate 2→4            | report exists, ceiling, replay protection |
-| `distribution`    | R4.2                | split sums to total, mints to pools |
-| `burn`            | R4.4                | fee burn/provider/treasury routing |
-| `governor`        | R4.5 / R5.4         | live ceiling, safe-ceiling rule |
-| `staking`         | staking/slashing    | escrowed stake, slash-burns supply |
-| `governance`      | R5.3 / Gate 5→2/4   | quadratic tally, enacts ceiling via governor |
+| `cput`            | Sui Coin + protocol state | fungible `Coin<CPUT>`, pools, ceiling, mint authority |
+| `policy`          | `cput_core::policy`       | shared economic constants |
+| `oracle_verifier` | Gate 1→2                  | t-of-n threshold + distinct signers |
+| `minting`         | Gate 2→4                  | report exists, ceiling, replay protection |
+| `distribution`    | R4.2                      | split sums to total, mints to pools |
+| `burn`            | R4.4                      | utility/payment fee routing |
+| `governance`      | R5.3 / Gate 5→2/4         | quadratic tally, enacts ceiling |
+| `staking`         | staking/slashing          | escrowed stake, slash-burns supply |
+| `audit_registry`  | `cput-audit` / R5.2       | on-chain audit-root anchor per epoch |
+
+**Off-chain relayer (`cput-sui`):** verifies PQC/ZK off-chain, posts
+`submit_report` / `execute_mint` / `set_ceiling`, reconciles `EpochMinted`
+events against `SettlementReceipt` via JSON-RPC.
+
+Legacy Aptos modules remain in `move/` for reference only.

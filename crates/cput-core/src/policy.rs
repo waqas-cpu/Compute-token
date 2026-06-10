@@ -31,6 +31,12 @@ pub const AGENT_QUORUM_SIZE: usize = 3;
 /// Maximum spread between agent mint proposals for consensus (±2%).
 pub const CONSENSUS_TOLERANCE_BPS: Bps = Bps(200);
 
+/// Default tokens minted per verified GFLOP (off-chain + relayer parity).
+pub const DEFAULT_TOKENS_PER_GFLOP: u128 = 1;
+
+/// Default emission policy version tag.
+pub const DEFAULT_EMISSION_VERSION: &str = "v1";
+
 // --- Distribution split (must sum to 100%). ---
 /// Compute providers' share of newly minted tokens.
 pub const SPLIT_PROVIDERS_BPS: Bps = Bps(7_000);

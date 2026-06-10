@@ -1,0 +1,12 @@
+[package]
+name = "cput"
+edition = "2024.beta"
+version = "0.1.0"
+authors = ["CPUT Protocol Contributors"]
+
+# Sui / MoveStdlib are injected automatically by `sui move build|test` to match
+# the installed CLI — do not pin a local `.sui-framework` checkout here (version
+# skew breaks `sui::test_utils` natives in `sui move test`).
+
+[addresses]
+cput = "0x0"

@@ -17,11 +17,13 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod anchor;
 pub mod envelope;
 pub mod mldsa;
 pub mod mlkem;
 pub mod registry;
 pub mod slhdsa;
 
+pub use anchor::{batch_digests, envelope_digest, pubkey_digest};
 pub use envelope::{SealedEnvelope, Signed};
 pub use registry::{AlgorithmId, AlgorithmRegistry};

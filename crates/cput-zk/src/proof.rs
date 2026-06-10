@@ -1,12 +1,16 @@
 //! Proof container and the backend trait.
 
+use crate::statements::{AgentReasoningStatement, ComputeStatement};
+use crate::witness::{ComputeWitness, ReasoningWitness};
 use cput_core::CputResult;
 use serde::{Deserialize, Serialize};
 
 /// Identifier of the proving system that produced a proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProofSystemId {
-    /// UltraPlonk (Noir / Barretenberg) — the production system.
+    /// Groth16 SNARK on BN254 (production backend).
+    Groth16,
+    /// UltraPlonk (Noir / Barretenberg) — future audited circuits.
     UltraPlonk,
     /// Deterministic reference backend (development / integration only).
     Reference,
@@ -51,4 +55,25 @@ pub trait ProofBackend {
     /// Verify an aggregate proof against the ordered batch of public inputs it
     /// claims to cover.
     fn verify_aggregate(&self, aggregate: &Proof, batch_inputs: &[Vec<u8>]) -> CputResult<()>;
+
+    /// Prove a compute statement. Production backends bind `witness`; reference
+    /// backends ignore it.
+    fn prove_compute(
+        &self,
+        statement: &ComputeStatement,
+        witness: &ComputeWitness,
+    ) -> CputResult<Proof> {
+        let _ = witness;
+        self.prove(&crate::encode_statement(statement)?)
+    }
+
+    /// Prove an agent-reasoning statement. Production backends bind `witness`.
+    fn prove_reasoning(
+        &self,
+        statement: &AgentReasoningStatement,
+        witness: &ReasoningWitness,
+    ) -> CputResult<Proof> {
+        let _ = witness;
+        self.prove(&crate::encode_statement(statement)?)
+    }
 }

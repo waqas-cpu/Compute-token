@@ -20,13 +20,21 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod factory;
+pub mod production;
 pub mod proof;
 pub mod reference;
+pub mod snark;
 pub mod statements;
+pub mod witness;
 
+pub use factory::ZkBackend;
+pub use production::ProductionBackend;
 pub use proof::{Proof, ProofBackend, ProofSystemId};
 pub use reference::ReferenceBackend;
+pub use snark::SnarkBackend;
 pub use statements::{AgentReasoningStatement, ComputeStatement};
+pub use witness::{ComputeWitness, ReasoningWitness};
 
 use cput_core::{CputError, CputResult};
 use serde::Serialize;

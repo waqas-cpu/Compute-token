@@ -22,20 +22,34 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod health;
+
+pub use health::{assess_quorum_health, AgentHealth, QuorumHealth};
+
 use cput_core::ids::OracleId;
 use cput_core::ids::{AgentId, EpochId};
 use cput_core::units::{Gflops, TokenAmount};
 use cput_core::{policy, CputError, CputResult};
 use cput_gates::contracts::{
-    EpochReport, MintInstruction, MintInstructionBody, NodeAllocation, NodeScore,
+    AgentProposalBody, EpochReport, MintInstruction, MintInstructionBody, NodeAllocation,
+    NodeScore,
 };
 use cput_gates::gate::{admit_epoch_report, GateConfig};
 use cput_pqc::envelope::Signed;
 use cput_pqc::mldsa::MlDsaKeypair;
-use cput_zk::{encode_statement, AgentReasoningStatement, ProofBackend};
+use cput_zk::{AgentReasoningStatement, ProofBackend, ReasoningWitness};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+
+/// Default emission policy used across all pipeline binaries (testnet + demos).
+#[must_use]
+pub fn default_emission_policy() -> EmissionPolicy {
+    EmissionPolicy {
+        tokens_per_gflop: policy::DEFAULT_TOKENS_PER_GFLOP,
+        version: policy::DEFAULT_EMISSION_VERSION.into(),
+    }
+}
 
 /// The committed emission policy the agents execute. Hashing this yields the
 /// `policy_hash` bound into every mint instruction (R2.4).
@@ -62,20 +76,65 @@ impl EmissionPolicy {
     }
 }
 
+/// Kind of minting agent in the Layer 2 quorum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgentKind {
+    /// Runs the committed emission formula (`tokens_per_gflop` × verified GFLOPs).
+    FormulaAgent,
+}
+
 /// One agent instance in the minting quorum. `bias_bps` models the small,
-/// bounded variation between independent model runs.
+/// bounded variation between independent model runs. Each agent holds an
+/// ML-DSA-87 key and signs its proposal (R2.2 PQC evidence).
 pub struct MintingAgent {
     /// Index within the quorum.
     pub id: AgentId,
+    /// Agent classification (prototype: all formula agents).
+    pub kind: AgentKind,
     /// Deterministic per-agent deviation from the base emission, in bps.
     pub bias_bps: i32,
+    keypair: MlDsaKeypair,
 }
 
 impl MintingAgent {
-    /// Construct an agent with no deviation from the committed formula.
+    /// Construct a formula agent with ML-DSA identity and no emission bias.
+    pub fn new(id: AgentId) -> CputResult<Self> {
+        Ok(Self {
+            id,
+            kind: AgentKind::FormulaAgent,
+            bias_bps: 0,
+            keypair: MlDsaKeypair::generate()?,
+        })
+    }
+
+    /// This agent's kind label for operators and health probes.
     #[must_use]
-    pub fn new(id: AgentId) -> Self {
-        Self { id, bias_bps: 0 }
+    pub fn kind_label(&self) -> &'static str {
+        match self.kind {
+            AgentKind::FormulaAgent => "formula-agent",
+        }
+    }
+
+    /// ML-DSA-87 public key for Gate 2→4 agent-proposal verification.
+    #[must_use]
+    pub fn public_key(&self) -> Vec<u8> {
+        self.keypair.public_bytes()
+    }
+
+    /// ML-DSA-87 sign this agent's independent proposal (R2.2).
+    pub fn sign_proposal(
+        &self,
+        policy: &EmissionPolicy,
+        verified: Gflops,
+        epoch: EpochId,
+    ) -> CputResult<Signed<AgentProposalBody>> {
+        let body = AgentProposalBody {
+            agent_id: self.id,
+            epoch,
+            proposal: self.propose(policy, verified),
+            policy_hash: policy.policy_hash(),
+        };
+        Signed::seal_mldsa(&self.keypair, body)
     }
 
     /// This agent's independent proposal for the epoch's mint total.
@@ -220,11 +279,23 @@ impl<'a, B: ProofBackend> AgentQuorum<'a, B> {
             mint_amount: total,
             policy_hash,
         };
-        let reasoning_proof = self.cfg.backend.prove(&encode_statement(&statement)?)?;
+        let witness = ReasoningWitness::from_formula(
+            report.body.epoch.0,
+            verified.0,
+            self.policy.tokens_per_gflop,
+            total,
+        );
+        let reasoning_proof = self.cfg.backend.prove_reasoning(&statement, &witness)?;
+
+        let mut agent_proposals = Vec::with_capacity(self.agents.len());
+        for agent in &self.agents {
+            agent_proposals.push(agent.sign_proposal(&self.policy, verified, report.body.epoch)?);
+        }
 
         let signed = Signed::seal_mldsa(&self.coordinator, body)?;
         Ok(MintInstruction {
             signed,
+            agent_proposals,
             reasoning_proof,
         })
     }

@@ -144,6 +144,18 @@ pub fn admit_epoch_report<B: ProofBackend>(
             reason: "aggregate proof folds a different number of proofs than node scores".into(),
         });
     }
+    if report.leaf_public_inputs.len() != report.body.node_scores.len() {
+        return Err(CputError::GateRejected {
+            gate: GATE,
+            reason: "leaf_public_inputs length != node_scores length".into(),
+        });
+    }
+    cfg.backend
+        .verify_aggregate(&report.aggregated_proof, &report.leaf_public_inputs)
+        .map_err(|e| CputError::GateRejected {
+            gate: GATE,
+            reason: format!("aggregate ZK proof invalid: {e}"),
+        })?;
 
     // (3) Reconcile GFLOP totals.
     if report.body.node_scores.is_empty() {
@@ -195,11 +207,53 @@ pub fn admit_mint_instruction<B: ProofBackend>(
     if instruction.signed.signer_public() != expected_agent_key {
         return Err(CputError::GateRejected {
             gate: GATE,
-            reason: "mint instruction not signed by the registered agent key".into(),
+            reason: "mint instruction not signed by the registered coordinator key".into(),
         });
     }
 
+    // R2.2 — each quorum agent must have a valid ML-DSA proposal signature.
+    if instruction.agent_proposals.len() < policy::AGENT_QUORUM_SIZE {
+        return Err(CputError::ThresholdNotMet {
+            have: instruction.agent_proposals.len(),
+            need: policy::AGENT_QUORUM_SIZE,
+        });
+    }
     let body = &instruction.signed.body;
+    let mut proposals: Vec<u128> = Vec::with_capacity(instruction.agent_proposals.len());
+    for signed_proposal in &instruction.agent_proposals {
+        signed_proposal.verify(cfg.registry).map_err(|e| CputError::GateRejected {
+            gate: GATE,
+            reason: format!("agent proposal signature invalid: {e}"),
+        })?;
+        let pb = &signed_proposal.body;
+        if pb.epoch != body.epoch {
+            return Err(CputError::GateRejected {
+                gate: GATE,
+                reason: "agent proposal epoch mismatch".into(),
+            });
+        }
+        if pb.policy_hash != body.policy_hash {
+            return Err(CputError::GateRejected {
+                gate: GATE,
+                reason: "agent proposal policy_hash mismatch".into(),
+            });
+        }
+        proposals.push(pb.proposal);
+    }
+    if !proposals.is_empty() {
+        let min = *proposals.iter().min().expect("non-empty");
+        let max = *proposals.iter().max().expect("non-empty");
+        if min > 0 {
+            let spread_bps = ((max - min).saturating_mul(10_000) / min) as u32;
+            if spread_bps > u32::from(policy::CONSENSUS_TOLERANCE_BPS.0) {
+                return Err(CputError::ConsensusFailed {
+                    spread_bps,
+                    tolerance_bps: u32::from(policy::CONSENSUS_TOLERANCE_BPS.0),
+                });
+            }
+        }
+    }
+
     let alloc_sum = body
         .allocations
         .iter()

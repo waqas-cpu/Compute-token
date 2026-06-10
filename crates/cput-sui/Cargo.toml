@@ -1,0 +1,21 @@
+[package]
+name = "cput-sui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Sui network integration: config, adapters, RPC queries, reconciliation, and relayer."
+
+[dependencies]
+cput-core.workspace = true
+cput-gates.workspace = true
+cput-pqc.workspace = true
+cput-store = { path = "../cput-store" }
+serde.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+toml = "0.8"
+ureq.workspace = true

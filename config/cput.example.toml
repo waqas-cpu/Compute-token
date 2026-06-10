@@ -1,0 +1,28 @@
+# CPUT Sui deployment — fill after `sui client publish`
+rpc_url = "https://fullnode.testnet.sui.io:443"
+package_id = "0xREPLACE_PACKAGE"
+protocol_state = "0xREPLACE_PROTOCOL_STATE"
+oracle_state = "0xREPLACE_ORACLE_STATE"
+mint_log = "0xREPLACE_MINT_LOG"
+governance_state = "0xREPLACE_GOVERNANCE_STATE"
+stake_book = "0xREPLACE_STAKE_BOOK"
+audit_registry = "0xREPLACE_AUDIT_REGISTRY"
+pqc_anchor_book = "0xREPLACE_PQC_ANCHOR_BOOK"
+agent_registry = "0xREPLACE_AGENT_REGISTRY"
+agent_quorum_book = "0xREPLACE_AGENT_QUORUM_BOOK"
+admin_cap = "0xREPLACE_ADMIN_CAP"
+sui_cli = "sui"
+dry_run = true
+
+# Gas sponsorship — sponsor wallet pays relayer gas (account-abstraction prep).
+[sponsor]
+enabled = false
+gas_owner = "0xREPLACE_SPONSOR_ADDRESS"
+gas_budget = 100000000
+gas_sponsor_state = "0xREPLACE_GAS_SPONSOR_STATE"
+
+[pools]
+provider = "0xREPLACE_PROVIDER_POOL"
+oracle = "0xREPLACE_ORACLE_POOL"
+treasury = "0xREPLACE_TREASURY_POOL"
+burn_reserve = "0xREPLACE_BURN_RESERVE_POOL"

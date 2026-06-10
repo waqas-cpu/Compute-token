@@ -4,7 +4,7 @@
 //! A contract pairs a signed body with whatever cryptographic evidence the
 //! receiving gate must check (ZK proofs, threshold signatures).
 
-use cput_core::ids::{EpochId, NodeId, OracleId, WorkloadHash};
+use cput_core::ids::{AgentId, EpochId, NodeId, OracleId, WorkloadHash};
 use cput_core::units::{Gflops, QualityScore, TokenAmount};
 use cput_pqc::envelope::{SealedEnvelope, Signed};
 use cput_pqc::AlgorithmId;
@@ -115,6 +115,8 @@ pub struct EpochReport {
     pub body: EpochReportBody,
     /// Recursive UltraPlonk aggregate proof covering all node proofs.
     pub aggregated_proof: Proof,
+    /// Ordered leaf public inputs used to re-verify the aggregate at Gate 1→2.
+    pub leaf_public_inputs: Vec<Vec<u8>>,
     /// 5-of-9 ML-DSA-65 threshold signature over the body.
     pub threshold_sig: ThresholdSignature,
 }
@@ -122,6 +124,19 @@ pub struct EpochReport {
 // ---------------------------------------------------------------------------
 // Gate 2→4: agent-signed mint instruction.
 // ---------------------------------------------------------------------------
+
+/// Body of one agent's independent mint proposal (R2.2 evidence).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentProposalBody {
+    /// Agent index in the quorum.
+    pub agent_id: AgentId,
+    /// Epoch being proposed for.
+    pub epoch: EpochId,
+    /// This agent's proposed mint total (base units).
+    pub proposal: u128,
+    /// Committed emission policy hash the agent executed.
+    pub policy_hash: [u8; 32],
+}
 
 /// Per-node token allocation within a mint instruction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,8 +166,10 @@ pub struct MintInstructionBody {
 /// correct formula execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintInstruction {
-    /// ML-DSA-87 signed mint-instruction body.
+    /// ML-DSA-87 signed mint-instruction body (coordinator seal).
     pub signed: Signed<MintInstructionBody>,
+    /// Per-agent ML-DSA-87 signed proposals (R2.2 quorum evidence).
+    pub agent_proposals: Vec<Signed<AgentProposalBody>>,
     /// ZK proof of correct agent reasoning.
     pub reasoning_proof: Proof,
 }

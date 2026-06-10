@@ -1,0 +1,17 @@
+[package]
+name = "cput-queue"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Durable inter-layer pipeline queue (telemetry, attestations, reports, mint intents)."
+
+[dependencies]
+cput-core.workspace = true
+cput-gates.workspace = true
+cput-layer0-compute.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sled = "0.34"

@@ -15,16 +15,24 @@ members = [
     "crates/cput-layer2-agentic",
     "crates/cput-layer4-tokenomics",
     "crates/cput-layer5-settlement",
+    "crates/cput-store",
+    "crates/cput-queue",
+    "crates/cput-sui",
+    "crates/cput-keycustody",
+    "crates/cput-api",
     # Binaries
     "crates/bins/cput-node",
+    "crates/bins/cput-api",
+    "crates/bins/cput-flop-meter",
     "crates/bins/cput-oracle",
     "crates/bins/cput-agent",
+    "crates/bins/cput-relayer",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.86"
 license = "Apache-2.0"
 authors = ["CPUT Protocol Contributors"]
 repository = "https://github.com/waqas-cpu/Compute-token"
@@ -42,14 +50,25 @@ cput-layer1-oracle = { path = "crates/cput-layer1-oracle" }
 cput-layer2-agentic = { path = "crates/cput-layer2-agentic" }
 cput-layer4-tokenomics = { path = "crates/cput-layer4-tokenomics" }
 cput-layer5-settlement = { path = "crates/cput-layer5-settlement" }
+cput-store = { path = "crates/cput-store" }
+cput-queue = { path = "crates/cput-queue" }
+cput-sui = { path = "crates/cput-sui" }
+cput-keycustody = { path = "crates/cput-keycustody" }
+cput-api = { path = "crates/cput-api" }
 
 # Third-party
+axum = { version = "0.7", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 sha2 = "0.10"
 hex = "0.4"
 rand_core = { version = "0.6", features = ["getrandom"] }
+clap = { version = "=4.4.18", features = ["derive"] }
+toml = "=0.8.19"
+ureq = { version = "=2.9.7", default-features = false, features = ["json", "tls"] }
 
 # NIST FIPS post-quantum cryptography (pure-Rust, integritychain)
 fips203 = "0.4"  # ML-KEM (FIPS 203)

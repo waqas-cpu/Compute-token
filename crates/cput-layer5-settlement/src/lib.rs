@@ -28,6 +28,8 @@ use cput_gates::gate::admit_settlement_receipt;
 use cput_pqc::envelope::{SealedEnvelope, Signed};
 use cput_pqc::slhdsa::SlhDsaKeypair;
 use cput_pqc::{AlgorithmId, AlgorithmRegistry};
+use cput_sui::adapter::set_ceiling_from_policy;
+use cput_sui::types::SetCeilingIntent;
 use serde::{Deserialize, Serialize};
 
 /// An SLH-DSA-signed commitment to a settled epoch's audit root (R5.2).
@@ -179,5 +181,15 @@ impl<'a> SettlementLayer<'a> {
             approved_algorithms: proposal.approved_algorithms.clone(),
         };
         Signed::seal_slhdsa(&self.governance_key, body)
+    }
+
+    /// Build the Sui `set_ceiling` intent for a passed policy update (downward gate 5→2/4).
+    pub fn ceiling_intent(
+        &self,
+        proposal: &Proposal,
+        tally: Tally,
+    ) -> CputResult<SetCeilingIntent> {
+        let update = self.enact(proposal, tally)?;
+        set_ceiling_from_policy(&update.body)
     }
 }
